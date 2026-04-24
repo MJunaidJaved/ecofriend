@@ -1,0 +1,151 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-serif: 'Playfair Display', Georgia, serif;
+    --font-sans: 'Inter', system-ui, sans-serif;
+
+    --background: 144 40% 4%;
+    --foreground: 120 10% 92%;
+    --card: 144 30% 7%;
+    --card-foreground: 120 10% 92%;
+    --popover: 144 30% 7%;
+    --popover-foreground: 120 10% 92%;
+    --primary: 142 71% 45%;
+    --primary-foreground: 144 40% 4%;
+    --secondary: 144 20% 12%;
+    --secondary-foreground: 120 10% 85%;
+    --muted: 144 15% 14%;
+    --muted-foreground: 120 5% 55%;
+    --accent: 152 60% 30%;
+    --accent-foreground: 120 10% 92%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 144 15% 15%;
+    --input: 144 15% 15%;
+    --ring: 142 71% 45%;
+    --chart-1: 142 71% 45%;
+    --chart-2: 160 60% 40%;
+    --chart-3: 180 50% 35%;
+    --chart-4: 120 40% 50%;
+    --chart-5: 100 50% 45%;
+    --radius: 0.75rem;
+    --sidebar-background: 144 35% 5%;
+    --sidebar-foreground: 120 10% 85%;
+    --sidebar-primary: 142 71% 45%;
+    --sidebar-primary-foreground: 144 40% 4%;
+    --sidebar-accent: 144 20% 10%;
+    --sidebar-accent-foreground: 120 10% 85%;
+    --sidebar-border: 144 15% 12%;
+    --sidebar-ring: 142 71% 45%;
+  }
+
+  .dark {
+    --background: 144 40% 4%;
+    --foreground: 120 10% 92%;
+    --card: 144 30% 7%;
+    --card-foreground: 120 10% 92%;
+    --popover: 144 30% 7%;
+    --popover-foreground: 120 10% 92%;
+    --primary: 142 71% 45%;
+    --primary-foreground: 144 40% 4%;
+    --secondary: 144 20% 12%;
+    --secondary-foreground: 120 10% 85%;
+    --muted: 144 15% 14%;
+    --muted-foreground: 120 5% 55%;
+    --accent: 152 60% 30%;
+    --accent-foreground: 120 10% 92%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 144 15% 15%;
+    --input: 144 15% 15%;
+    --ring: 142 71% 45%;
+    --chart-1: 142 71% 45%;
+    --chart-2: 160 60% 40%;
+    --chart-3: 180 50% 35%;
+    --chart-4: 120 40% 50%;
+    --chart-5: 100 50% 45%;
+    --sidebar-background: 144 35% 5%;
+    --sidebar-foreground: 120 10% 85%;
+    --sidebar-primary: 142 71% 45%;
+    --sidebar-primary-foreground: 144 40% 4%;
+    --sidebar-accent: 144 20% 10%;
+    --sidebar-accent-foreground: 120 10% 85%;
+    --sidebar-border: 144 15% 12%;
+    --sidebar-ring: 142 71% 45%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: hsl(144 30% 5%);
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(142 71% 25%);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(142 71% 35%);
+}
+
+/* Typing cursor blink */
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+.cursor-blink {
+  animation: blink 1s infinite;
+}
+
+/* Breathing glow */
+@keyframes breathe {
+  0%, 100% { box-shadow: 0 0 15px 2px hsla(142, 71%, 45%, 0.3); }
+  50% { box-shadow: 0 0 25px 6px hsla(142, 71%, 45%, 0.5); }
+}
+.glow-breathe {
+  animation: breathe 3s ease-in-out infinite;
+}
+
+/* Border pulse animation */
+@keyframes border-pulse {
+  0% { border-color: hsla(142, 71%, 45%, 0.2); }
+  50% { border-color: hsla(142, 71%, 45%, 0.6); }
+  100% { border-color: hsla(142, 71%, 45%, 0.2); }
+}
+.border-pulse {
+  animation: border-pulse 2s ease-in-out infinite;
+}
+
+/* Heartbeat border glow for AI messages */
+@keyframes heartbeat-border {
+  0%, 100% { border-left-color: var(--accent-glow, rgba(74,222,128,0.4)); box-shadow: -3px 0 10px rgba(74,222,128,0.08); }
+  50% { border-left-color: var(--accent-glow, rgba(74,222,128,0.8)); box-shadow: -4px 0 18px rgba(74,222,128,0.25); }
+}
+
+/* Heat haze distortion for wildlife theme AI messages */
+@keyframes heat-haze {
+  0%   { filter: blur(0px); transform: translateX(0px) scaleY(1); }
+  25%  { filter: blur(0.3px); transform: translateX(0.6px) scaleY(1.002); }
+  50%  { filter: blur(0px); transform: translateX(-0.4px) scaleY(0.999); }
+  75%  { filter: blur(0.2px); transform: translateX(0.5px) scaleY(1.001); }
+  100% { filter: blur(0px); transform: translateX(0px) scaleY(1); }
+}
+.heat-haze {
+  animation: heat-haze 3.5s ease-in-out infinite;
+}

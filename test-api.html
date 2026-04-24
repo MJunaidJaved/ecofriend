@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>API Test</title>
+</head>
+<body>
+    <h1>EcoFriend API Test</h1>
+    <div id="results"></div>
+    <button onclick="testLogin()">Test Login</button>
+    <button onclick="testChallenges()">Test Challenges (needs auth)</button>
+
+    <script>
+        const API_BASE = 'http://localhost:3001';
+        const results = document.getElementById('results');
+
+        function log(msg, isError = false) {
+            const div = document.createElement('div');
+            div.style.color = isError ? 'red' : 'green';
+            div.style.margin = '10px 0';
+            div.style.padding = '10px';
+            div.style.border = `1px solid ${isError ? 'red' : 'green'}`;
+            div.innerHTML = `<strong>${new Date().toLocaleTimeString()}:</strong> ${msg}`;
+            results.appendChild(div);
+            console.log(msg);
+        }
+
+        async function testLogin() {
+            log('Testing login...');
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: 'junaidjaved2113@gmail.com',
+                        password: 'Junaid518%@*'
+                    })
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    log(`Login failed: ${error.error}`, true);
+                    return;
+                }
+                
+                const data = await response.json();
+                log(`Login SUCCESS! Token received: ${data.token.substring(0, 20)}...`);
+                log(`User: ${data.user.username}, Eco Score: ${data.user.eco_score}`);
+                
+                // Save token
+                localStorage.setItem('token', data.token);
+                localStorage.setItem('user', JSON.stringify(data.user));
+            } catch (err) {
+                log(`Connection error: ${err.message}`, true);
+            }
+        }
+
+        async function testChallenges() {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                log('No token found. Please login first.', true);
+                return;
+            }
+            
+            log('Testing challenges endpoint...');
+            try {
+                const response = await fetch(`${API_BASE}/api/challenges`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    log(`Challenges failed: ${error.error}`, true);
+                    return;
+                }
+                
+                const data = await response.json();
+                log(`Challenges loaded! Count: ${data.challenges.length}`);
+                data.challenges.slice(0, 3).forEach(c => {
+                    log(`- ${c.title} (${c.difficulty}) - ${c.completed ? 'Completed' : 'Not completed'}`);
+                });
+            } catch (err) {
+                log(`Connection error: ${err.message}`, true);
+            }
+        }
+
+        // Auto-test on load
+        log('Page loaded. Click "Test Login" to verify API connection.');
+    </script>
+</body>
+</html>
