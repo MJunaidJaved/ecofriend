@@ -114,6 +114,18 @@ async function initDatabase() {
 
     console.log('Default challenges seeded');
   }
+
+  // Streak columns for daily challenges (safe if already present)
+  try {
+    await run('ALTER TABLE users ADD COLUMN challenge_streak INTEGER DEFAULT 0');
+  } catch (_) {
+    /* column exists */
+  }
+  try {
+    await run('ALTER TABLE users ADD COLUMN challenge_last_full_day TEXT');
+  } catch (_) {
+    /* column exists */
+  }
 }
 
 // Export database and helper functions

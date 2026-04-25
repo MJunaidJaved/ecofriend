@@ -48,7 +48,7 @@ export default function Challenges() {
   const [challenges, setChallenges] = useState([]);
   const [loading, setLoading] = useState(true);
   const [ecoScore, setEcoScore] = useState(0);
-  const [streak] = useState(1);
+  const [streak, setStreak] = useState(0);
 
   // Authentication protection
   useEffect(() => {
@@ -70,6 +70,7 @@ export default function Challenges() {
         image: challengeImages[c.id] || challengeImages[1]
       }));
       setChallenges(challengesWithImages);
+      if (typeof data.streak === 'number') setStreak(data.streak);
 
       const userData = await apiGet('/api/auth/me');
       setEcoScore(userData.user.eco_score);
@@ -87,6 +88,7 @@ export default function Challenges() {
     try {
       const data = await apiPost(`/api/challenges/${id}/complete`, {});
       setEcoScore(data.eco_score);
+      if (typeof data.streak === 'number') setStreak(data.streak);
 
       setChallenges((prev) =>
         prev.map((c) => c.id === id ? { ...c, completed: true } : c)
@@ -124,7 +126,9 @@ export default function Challenges() {
             <h1 className="font-serif text-4xl md:text-5xl font-bold text-white mb-2">
               Eco Challenges
             </h1>
-            <p className="font-sans text-white/50">Complete challenges. Build better habits.</p>
+            <p className="font-sans text-white/50">
+              Complete challenges each day. Checkmarks clear on a new day so you can earn points again and grow your streak.
+            </p>
             <p className="font-sans text-sm mt-1" style={{ color: theme.accent }}>
               Eco Score: {ecoScore} pts
             </p>

@@ -7,6 +7,44 @@ const https = require('https');
 const path = require('path');
 const { run, get, all, initDatabase } = require('./database');
 
+/** Calendar YYYY-MM-DD in the server's local timezone */
+function localCalendarDate(d = new Date()) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function timestampToLocalCalendarDate(ts) {
+  if (!ts) return null;
+  return localCalendarDate(new Date(ts));
+}
+
+function isChallengeCompletedToday(completedAt) {
+  if (!completedAt) return false;
+  return timestampToLocalCalendarDate(completedAt) === localCalendarDate();
+}
+
+/** Whole calendar days between two YYYY-MM-DD strings (later − earlier). */
+function calendarDaysBetween(earlierYmd, laterYmd) {
+  const [y1, m1, d1] = earlierYmd.split('-').map(Number);
+  const [y2, m2, d2] = laterYmd.split('-').map(Number);
+  const a = new Date(y1, m1 - 1, d1);
+  const b = new Date(y2, m2 - 1, d2);
+  return Math.round((b - a) / 86400000);
+}
+
+/**
+ * If the user missed at least one full day since last "all challenges" day, streak goes to 0.
+ */
+async function applyStreakMissedDays(userId, lastFullDay, todayYmd) {
+  if (!lastFullDay) return;
+  const gap = calendarDaysBetween(lastFullDay, todayYmd);
+  if (gap >= 2) {
+    await run('UPDATE users SET challenge_streak = 0 WHERE id = ?', [userId]);
+  }
+}
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 const JWT_SECRET = process.env.JWT_SECRET || 'ecofriend_super_secret_2024';
@@ -134,10 +172,11 @@ app.get('/api/user/stats', authenticateToken, async (req, res) => {
       [req.userId]
     );
 
-    const completedCount = await get(
-      'SELECT COUNT(*) as count FROM user_challenges WHERE user_id = ? AND completed = 1',
+    const doneRows = await all(
+      'SELECT completed_at FROM user_challenges WHERE user_id = ? AND completed = 1',
       [req.userId]
     );
+    const completedToday = doneRows.filter((r) => isChallengeCompletedToday(r.completed_at)).length;
 
     const totalChallenges = await get(
       'SELECT COUNT(*) as count FROM challenges'
@@ -155,7 +194,7 @@ app.get('/api/user/stats', authenticateToken, async (req, res) => {
 
     res.json({
       user,
-      completedChallenges: completedCount.count,
+      completedChallenges: completedToday,
       totalChallenges: totalChallenges.count,
       carbonHistory,
       totalConversations: conversationCount.count,
@@ -332,19 +371,48 @@ app.get('/api/challenges', authenticateToken, async (req, res) => {
   try {
     const challenges = await all('SELECT * FROM challenges');
 
-    const challengesWithStatus = await Promise.all(challenges.map(async (challenge) => {
-      const userChallenge = await get(
-        'SELECT completed FROM user_challenges WHERE user_id = ? AND challenge_id = ?',
-        [req.userId, challenge.id]
-      );
+    if (req.isGuest || req.userId == null) {
+      return res.json({
+        challenges: challenges.map((c) => ({ ...c, completed: false })),
+        streak: 0,
+      });
+    }
 
-      return {
-        ...challenge,
-        completed: userChallenge ? userChallenge.completed === 1 : false
-      };
-    }));
+    const user = await get(
+      'SELECT id, challenge_streak, challenge_last_full_day FROM users WHERE id = ?',
+      [req.userId]
+    );
+    if (!user) {
+      return res.json({
+        challenges: challenges.map((c) => ({ ...c, completed: false })),
+        streak: 0,
+      });
+    }
 
-    res.json({ challenges: challengesWithStatus });
+    const todayYmd = localCalendarDate();
+    await applyStreakMissedDays(req.userId, user.challenge_last_full_day, todayYmd);
+
+    const userFresh = await get(
+      'SELECT challenge_streak, challenge_last_full_day FROM users WHERE id = ?',
+      [req.userId]
+    );
+
+    const challengesWithStatus = await Promise.all(
+      challenges.map(async (challenge) => {
+        const row = await get(
+          'SELECT completed, completed_at FROM user_challenges WHERE user_id = ? AND challenge_id = ?',
+          [req.userId, challenge.id]
+        );
+        const completed =
+          !!row && row.completed === 1 && isChallengeCompletedToday(row.completed_at);
+        return { ...challenge, completed };
+      })
+    );
+
+    res.json({
+      challenges: challengesWithStatus,
+      streak: userFresh.challenge_streak ?? 0,
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -353,15 +421,26 @@ app.get('/api/challenges', authenticateToken, async (req, res) => {
 // POST /api/challenges/:id/complete
 app.post('/api/challenges/:id/complete', authenticateToken, async (req, res) => {
   try {
+    if (req.isGuest || req.userId == null) {
+      return res.status(401).json({ error: 'Sign in to complete challenges' });
+    }
+
     const { id } = req.params;
+    const todayYmd = localCalendarDate();
+
+    const u0 = await get(
+      'SELECT challenge_last_full_day FROM users WHERE id = ?',
+      [req.userId]
+    );
+    await applyStreakMissedDays(req.userId, u0?.challenge_last_full_day, todayYmd);
 
     const existing = await get(
       'SELECT * FROM user_challenges WHERE user_id = ? AND challenge_id = ?',
       [req.userId, id]
     );
 
-    if (existing && existing.completed === 1) {
-      return res.status(400).json({ error: 'Challenge already completed' });
+    if (existing && existing.completed === 1 && isChallengeCompletedToday(existing.completed_at)) {
+      return res.status(400).json({ error: 'Challenge already completed today' });
     }
 
     const challenge = await get('SELECT points FROM challenges WHERE id = ?', [id]);
@@ -386,9 +465,41 @@ app.post('/api/challenges/:id/complete', authenticateToken, async (req, res) => 
       [challenge.points, req.userId]
     );
 
-    const user = await get('SELECT eco_score FROM users WHERE id = ?', [req.userId]);
+    const totalCh = (await get('SELECT COUNT(*) as n FROM challenges')).n;
+    const doneRows = await all(
+      'SELECT completed_at FROM user_challenges WHERE user_id = ? AND completed = 1',
+      [req.userId]
+    );
+    const completedTodayCount = doneRows.filter((r) => isChallengeCompletedToday(r.completed_at)).length;
 
-    res.json({ eco_score: user.eco_score });
+    if (completedTodayCount === totalCh && totalCh > 0) {
+      const streakUser = await get(
+        'SELECT challenge_streak, challenge_last_full_day FROM users WHERE id = ?',
+        [req.userId]
+      );
+      const last = streakUser.challenge_last_full_day;
+      if (last !== todayYmd) {
+        let newStreak;
+        if (!last) {
+          newStreak = 1;
+        } else if (calendarDaysBetween(last, todayYmd) === 1) {
+          newStreak = (streakUser.challenge_streak ?? 0) + 1;
+        } else {
+          newStreak = 1;
+        }
+        await run(
+          'UPDATE users SET challenge_streak = ?, challenge_last_full_day = ? WHERE id = ?',
+          [newStreak, todayYmd, req.userId]
+        );
+      }
+    }
+
+    const user = await get(
+      'SELECT eco_score, challenge_streak FROM users WHERE id = ?',
+      [req.userId]
+    );
+
+    res.json({ eco_score: user.eco_score, streak: user.challenge_streak ?? 0 });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
