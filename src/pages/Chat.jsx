@@ -56,6 +56,17 @@ export default function Chat() {
   const [currentUser, setCurrentUser] = useState(null);
   const scrollRef = useRef(null);
 
+  // Per-theme chat storage persisted in localStorage
+  const getChatStore = () => {
+    try {
+      const raw = localStorage.getItem('chatStore');
+      return raw ? JSON.parse(raw) : {};
+    } catch { return {}; }
+  };
+  const saveChatStore = (store) => {
+    localStorage.setItem('chatStore', JSON.stringify(store));
+  };
+
   // Authentication protection - redirect if no token
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -67,16 +78,6 @@ export default function Chat() {
   // Load user data
   useEffect(() => {
     const loadUser = async () => {
-      const token = localStorage.getItem('token');
-      if (token === 'guest') {
-        setCurrentUser({
-          id: 'guest',
-          username: 'Guest',
-          eco_score: 0,
-          isGuest: true,
-        });
-        return;
-      }
       try {
         const data = await apiGet('/api/auth/me');
         setCurrentUser(data.user);
@@ -89,16 +90,69 @@ export default function Chat() {
     loadUser();
   }, []);
 
+  // Load saved chat for current theme on mount, or show greeting
   useEffect(() => {
-    setMessages([
-      {
-        role: 'assistant',
-        content: THEME_GREETINGS[theme.id] || THEME_GREETINGS.forests,
-      },
-    ]);
-    setConversationId(null);
-    setContextCard(null);
+    const store = getChatStore();
+    const saved = store[theme.id];
+    if (saved) {
+      setMessages(saved.messages);
+      setConversationId(saved.conversationId);
+      setContextCard(saved.contextCard || null);
+    } else {
+      setMessages([
+        {
+          role: 'assistant',
+          content: THEME_GREETINGS[theme.id] || THEME_GREETINGS.forests,
+        },
+      ]);
+      setConversationId(null);
+      setContextCard(null);
+    }
+  }, []);
+
+  // When theme changes, save current chat and restore the new theme's chat
+  const prevThemeIdRef = useRef(theme.id);
+  useEffect(() => {
+    const prevId = prevThemeIdRef.current;
+    const newId = theme.id;
+    if (prevId === newId) return;
+
+    // Save current messages before switching
+    setMessages((currentMessages) => {
+      setConversationId((currentConvId) => {
+        setContextCard((currentCard) => {
+          const store = getChatStore();
+          store[prevId] = {
+            messages: currentMessages,
+            conversationId: currentConvId,
+            contextCard: currentCard,
+          };
+          saveChatStore(store);
+
+          // Now restore new theme's chat
+          const saved = store[newId];
+          if (saved) {
+            setMessages(saved.messages);
+            setConversationId(saved.conversationId);
+            setContextCard(saved.contextCard || null);
+          } else {
+            setMessages([
+              {
+                role: 'assistant',
+                content: THEME_GREETINGS[newId] || THEME_GREETINGS.forests,
+              },
+            ]);
+            setConversationId(null);
+            setContextCard(null);
+          }
+          return currentCard;
+        });
+        return currentConvId;
+      });
+      return currentMessages;
+    });
     setIsThinking(false);
+    prevThemeIdRef.current = newId;
   }, [theme.id]);
 
   useEffect(() => {
@@ -136,9 +190,8 @@ export default function Chat() {
       // Create conversation if it doesn't exist
       let currentConversationId = conversationId;
       const token = localStorage.getItem('token');
-      const isGuest = token === 'guest';
 
-      if (!currentConversationId && !isGuest) {
+      if (!currentConversationId) {
         const convResponse = await apiPost('/api/conversations', {
           topic: theme.id,
           title: text.slice(0, 50) + (text.length > 50 ? '...' : '')
@@ -147,20 +200,16 @@ export default function Chat() {
         setConversationId(currentConversationId);
       }
 
-      if (isGuest) {
-        currentConversationId = 'guest-' + Date.now();
-      }
-
       // Send message to backend with streaming
       const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': isGuest ? 'Bearer guest' : `Bearer ${token}`
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
           message: text,
-          conversation_id: isGuest ? null : currentConversationId,
+          conversation_id: currentConversationId,
           topic: theme.id
         })
       });
@@ -240,15 +289,20 @@ export default function Chat() {
   const handleSelectTopic = () => {};
 
   const handleClearChat = () => {
-    setMessages([
+    const greeting = [
       {
         role: 'assistant',
         content: THEME_GREETINGS[theme.id] || THEME_GREETINGS.forests,
       },
-    ]);
+    ];
+    setMessages(greeting);
     setConversationId(null);
     setContextCard(null);
     setIsThinking(false);
+    // Also clear from localStorage store so it doesn't restore old messages
+    const store = getChatStore();
+    store[theme.id] = { messages: greeting, conversationId: null, contextCard: null };
+    saveChatStore(store);
   };
 
   return (

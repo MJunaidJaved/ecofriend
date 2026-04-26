@@ -61,18 +61,11 @@ const authenticateToken = (req, res, next) => {
     return res.status(401).json({ error: 'Access token required' });
   }
 
-  if (token === 'guest') {
-    req.userId = null;
-    req.isGuest = true;
-    return next();
-  }
-
   jwt.verify(token, JWT_SECRET, (err, user) => {
     if (err) {
       return res.status(403).json({ error: 'Invalid token' });
     }
     req.userId = user.userId;
-    req.isGuest = false;
     next();
   });
 };
@@ -157,16 +150,6 @@ app.get('/api/auth/me', authenticateToken, async (req, res) => {
 // GET /api/user/stats
 app.get('/api/user/stats', authenticateToken, async (req, res) => {
   try {
-    if (req.isGuest) {
-      return res.json({
-        user: { username: 'Guest', eco_score: 0, created_at: new Date() },
-        completedChallenges: 0,
-        totalChallenges: 0,
-        carbonHistory: [],
-        totalConversations: 0,
-      });
-    }
-
     const user = await get(
       'SELECT id, username, email, eco_score, created_at FROM users WHERE id = ?',
       [req.userId]
@@ -243,7 +226,7 @@ app.post('/api/chat', authenticateToken, async (req, res) => {
     const { message, conversation_id, topic } = req.body;
 
     // Save user message
-    if (!req.isGuest && conversation_id) {
+    if (conversation_id) {
       await run(
         'INSERT INTO messages (conversation_id, role, content) VALUES (?, ?, ?)',
         [conversation_id, 'user', message]
@@ -303,7 +286,7 @@ app.post('/api/chat', authenticateToken, async (req, res) => {
             const data = line.slice(6);
             if (data === '[DONE]') {
               // Save the full AI response
-              if (!req.isGuest && conversation_id && fullResponse) {
+              if (conversation_id && fullResponse) {
                 await run(
                   'INSERT INTO messages (conversation_id, role, content) VALUES (?, ?, ?)',
                   [conversation_id, 'assistant', fullResponse]
@@ -328,7 +311,7 @@ app.post('/api/chat', authenticateToken, async (req, res) => {
       });
 
       apiRes.on('end', async () => {
-        if (!req.isGuest && conversation_id && fullResponse) {
+        if (conversation_id && fullResponse) {
           await run(
             'INSERT INTO messages (conversation_id, role, content) VALUES (?, ?, ?)',
             [conversation_id, 'assistant', fullResponse]
@@ -371,7 +354,7 @@ app.get('/api/challenges', authenticateToken, async (req, res) => {
   try {
     const challenges = await all('SELECT * FROM challenges');
 
-    if (req.isGuest || req.userId == null) {
+    if (req.userId == null) {
       return res.json({
         challenges: challenges.map((c) => ({ ...c, completed: false })),
         streak: 0,
@@ -421,7 +404,7 @@ app.get('/api/challenges', authenticateToken, async (req, res) => {
 // POST /api/challenges/:id/complete
 app.post('/api/challenges/:id/complete', authenticateToken, async (req, res) => {
   try {
-    if (req.isGuest || req.userId == null) {
+    if (req.userId == null) {
       return res.status(401).json({ error: 'Sign in to complete challenges' });
     }
 

@@ -59,18 +59,6 @@ function LandingContent() {
     setShowAuth(true);
   };
 
-  const handleGuestAccess = () => {
-    localStorage.setItem('token', 'guest');
-    localStorage.setItem('user', JSON.stringify({
-      id: 'guest',
-      username: 'Guest',
-      email: '',
-      eco_score: 0,
-      isGuest: true,
-    }));
-    setLeaving(true);
-    setTimeout(() => navigate('/chat'), 700);
-  };
 
   const handleAuth = async (e) => {
     e.preventDefault();
@@ -256,24 +244,6 @@ function LandingContent() {
                       </button>
                     </p>
 
-                    <div className="relative flex items-center gap-3 my-1">
-                      <div className="flex-1 h-px bg-white/10" />
-                      <span className="text-xs text-white/30 font-sans">or</span>
-                      <div className="flex-1 h-px bg-white/10" />
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={handleGuestAccess}
-                      className="w-full py-3 rounded-xl font-sans text-sm font-medium transition-all hover:brightness-125"
-                      style={{
-                        backgroundColor: 'rgba(255,255,255,0.05)',
-                        border: '1px solid rgba(255,255,255,0.12)',
-                        color: 'rgba(255,255,255,0.6)',
-                      }}
-                    >
-                      Continue as Guest
-                    </button>
                   </form>
                 </motion.div>
               )}
