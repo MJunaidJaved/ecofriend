@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Leaf, User, Lock, Mail, LogIn, UserPlus } from 'lucide-react';
+import { Leaf, User, Lock, Mail, LogIn, UserPlus, Eye, EyeOff } from 'lucide-react';
 import ThemedBackground from '../components/ThemedBackground';
 import { ThemeProvider } from '@/lib/ThemeContext';
 import { apiPost } from '../api/base44Client';
@@ -22,6 +22,7 @@ function LandingContent() {
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState(null);
   const [toastVisible, setToastVisible] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     // Check if already logged in
@@ -206,13 +207,20 @@ function LandingContent() {
                     <div className="relative">
                       <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/50" />
                       <input
-                        type="password"
+                        type={showPassword ? 'text' : 'password'}
                         placeholder="Password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        className="w-full pl-10 pr-4 py-3 rounded-xl bg-black/40 border border-white/20 text-white placeholder-white/50 focus:outline-none focus:border-green-400/50"
+                        className="w-full pl-10 pr-10 py-3 rounded-xl bg-black/40 border border-white/20 text-white placeholder-white/50 focus:outline-none focus:border-green-400/50"
                         required
                       />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((v) => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-white/50 hover:text-white/80 transition-colors"
+                      >
+                        {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                      </button>
                     </div>
 
                     {error && (
